@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Booking Assurance prototype</title>
+<style>
+  :root {
+    --orange: #FF5B00;
+    --orange-press: #E65200;
+    --bg: #F5F5F5;
+    --card: #FFFFFF;
+    --text: #1A1A1A;
+    --text-2: #4A4A4A;
+    --muted: #757575;
+    --line: #EBEBEB;
+    --green: #0E8A4F;
+    --green-bg: #E6F4EC;
+    --amber: #8A5300;
+    --amber-bg: #FFF3D6;
+    --red: #D32F2F;
+    --red-bg: #FDECEC;
+    --page: #E4E4E7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  body {
+    background: var(--page);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  /* ───────── Stage ───────── */
+  #stage { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; padding-top: 16px; }
+  #scaler { width: 390px; height: 844px; transform-origin: center center; flex-shrink: 0; }
+  .phone {
+    width: 390px; height: 844px; border-radius: 48px; background: var(--bg);
+    overflow: hidden; position: relative; display: flex; flex-direction: column;
+    box-shadow: 0 0 0 10px #111, 0 0 0 11px #2a2a2a, 0 24px 60px rgba(0,0,0,.22);
+  }
+  .statusbar {
+    height: 47px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 30px 0 36px; font-size: 16px; font-weight: 600; background: var(--card); position: relative; z-index: 3;
+  }
+  .statusbar .notch { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: 120px; height: 33px; background: #111; border-radius: 20px; }
+  .statusbar .icons { display: flex; gap: 6px; align-items: center; }
+
+  /* ───────── Screens ───────── */
+  /* The one scroll container inside the frame. Screens inside it are as tall as their content. */
+  #viewport {
+    position: absolute; top: 47px; left: 0; right: 0; height: calc(100% - 47px);
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+  #viewport::-webkit-scrollbar { display: none; }
+  .screen { display: none; padding-bottom: 80px; }
+  .screen.active { display: block; }
+  .appbar {
+    position: sticky; top: 0; z-index: 2;
+    height: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 0 8px;
+    background: var(--card); border-bottom: 1px solid var(--line);
+  }
+  .appbar h1 { font-size: 17px; font-weight: 600; flex: 1; }
+  .appbar .wordmark { flex: 1; }
+  .icon-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 22px; flex-shrink: 0; }
+  .icon-btn:active { background: var(--bg); }
+  .wordmark { font-size: 24px; font-weight: 800; color: var(--orange); letter-spacing: -0.5px; }
+  .scroll { padding: 16px 16px 0; }
+  /* Bookings list: tab bar pinned to the bottom of the frame, padding sits above it instead */
+  #s-list { padding-bottom: 0; min-height: 100%; flex-direction: column; }
+  #s-list.active { display: flex; }
+  #s-list .scroll { flex: 1; padding-bottom: 80px; }
+
+  /* ───────── Building blocks ───────── */
+  .card { background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .rows { margin-top: 10px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; font-size: 14px; gap: 12px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row .k { color: var(--muted); }
+  .row .v { font-weight: 600; text-align: right; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .5px; }
+  .btn {
+    display: flex; align-items: center; justify-content: center; width: 100%; min-height: 50px;
+    border-radius: 12px; font-size: 16px; font-weight: 700; padding: 0 16px;
+  }
+  .btn-primary { background: var(--orange); color: #fff; }
+  .btn-primary:active { background: var(--orange-press); }
+  .btn-primary[disabled] { opacity: .75; cursor: default; }
+  .btn-secondary { background: var(--card); color: var(--text); border: 1px solid #D6D6D6; }
+  .text-btn { color: var(--orange); font-size: 14px; font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; padding: 0 2px; }
+
+  .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; padding: 5px 10px; border-radius: 999px; line-height: 1.3; }
+  .pill.waiting { background: var(--amber-bg); color: var(--amber); }
+  .pill.confirmed { background: var(--green-bg); color: var(--green); }
+  .pill.notconfirmed { background: var(--amber-bg); color: var(--amber); }
+  .status-note { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.45; }
+
+  .thumb { width: 72px; height: 72px; border-radius: 10px; flex-shrink: 0; overflow: hidden; }
+  .thumb svg { display: block; }
+
+  /* Confirmation */
+  .tick-wrap { text-align: center; padding: 8px 0 18px; }
+  .tick { width: 64px; height: 64px; border-radius: 50%; background: var(--green); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+  .tick-wrap h2 { font-size: 24px; font-weight: 700; }
+  .tick-wrap p { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .act-head { display: flex; gap: 12px; align-items: center; }
+  .act-head .name { font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .act-head .op { font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .qr-card { text-align: center; }
+  .qr-card .qr { display: inline-block; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 10px; margin: 8px 0 6px; }
+  .qr-card .qr svg { display: block; }
+
+  .received { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .received-line { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .received .text-btn { margin-top: 2px; }
+  .alert {
+    background: var(--red-bg); border: 1px solid #F3C2C2; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
+  }
+  .alert-head { display: flex; gap: 10px; align-items: flex-start; }
+  .alert-icon { width: 22px; height: 22px; border-radius: 50%; background: var(--red); color: #fff; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .alert-text { font-size: 15px; font-weight: 700; color: #9F1D1D; line-height: 1.35; }
+  .alert .btn { margin-top: 12px; min-height: 44px; font-size: 15px; background: var(--red); color: #fff; }
+  .alert .btn:active { background: #B71C1C; }
+  /* Pinned primary action on screen 1, always visible without scrolling */
+  #s-confirm { padding-bottom: 0; }
+  #s-confirm .scroll { padding-bottom: 24px; }
+  .footer-bar {
+    position: sticky; bottom: 0; z-index: 2; background: var(--card);
+    border-top: 1px solid var(--line); padding: 12px 16px 30px;
+  }
+  .caption { font-size: 13px; color: var(--muted); line-height: 1.45; margin: -4px 4px 16px; }
+
+  /* Bookings list */
+  .seg { display: flex; gap: 8px; margin-bottom: 14px; }
+  .seg span { font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 999px; background: var(--card); color: var(--muted); }
+  .seg span.on { background: var(--text); color: #fff; }
+  .bk { display: block; width: 100%; text-align: left; background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .bk.tappable:active { background: #FAFAFA; }
+  .bk-top { display: flex; gap: 12px; }
+  .bk-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .bk-meta { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+  .bk-ref { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .bk-status { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .tabbar { position: sticky; bottom: 0; z-index: 2; height: 82px; flex-shrink: 0; background: var(--card); border-top: 1px solid var(--line); display: flex; padding: 8px 8px 26px; }
+  .tabbar div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--muted); }
+  .tabbar div.on { color: var(--orange); font-weight: 600; }
+
+  /* Detail */
+  .today {
+    background: var(--card); border-radius: 14px; padding: 12px 12px 12px 16px; margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line);
+  }
+  .today .t { font-size: 15px; font-weight: 700; white-space: nowrap; }
+  .today .btn { width: auto; min-height: 44px; font-size: 14px; padding: 0 12px; border-radius: 10px; white-space: nowrap; }
+
+  /* Mismatch */
+  .mm h2 { font-size: 22px; font-weight: 700; line-height: 1.25; margin: 4px 0 8px; }
+  .mm p.body { font-size: 15px; color: var(--text-2); line-height: 1.45; margin-bottom: 16px; }
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; background: var(--card); border-radius: 14px; overflow: hidden; margin-bottom: 20px; }
+  .cmp .h { font-size: 11.5px; font-weight: 700; letter-spacing: .6px; color: var(--muted); padding: 14px 14px 10px; border-bottom: 1px solid var(--line); }
+  .cmp .c { font-size: 16px; font-weight: 600; padding: 14px; border-bottom: 1px solid var(--line); }
+  .cmp .c:nth-last-child(-n+2) { border-bottom: 0; }
+  .cmp .h:nth-child(odd), .cmp .c:nth-child(odd) { border-right: 1px solid var(--line); }
+  .cmp .c.bad { background: var(--red-bg); color: var(--red); font-size: 20px; font-weight: 800; box-shadow: inset 0 0 0 2px var(--red); }
+  .done-state { text-align: center; padding: 28px 8px 8px; }
+  .done-state .tick { margin-bottom: 16px; }
+  .done-state h2 { font-size: 21px; font-weight: 700; line-height: 1.3; }
+  .ref-box { display: inline-block; margin: 16px 0 24px; padding: 10px 16px; background: var(--card); border-radius: 10px; font-size: 13px; color: var(--muted); }
+  .ref-box b { display: block; font-size: 17px; color: var(--text); margin-top: 2px; }
+
+  /* At the desk */
+  .desk h2 { font-size: 30px; font-weight: 800; line-height: 1.15; margin: 2px 0 14px; }
+  .big-fields { background: var(--card); border-radius: 16px; padding: 4px 18px; margin-bottom: 12px; }
+  .bf { padding: 12px 0; }
+  .bf + .bf { border-top: 1px solid var(--line); }
+  .bf .k { font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .bf .v { font-size: 28px; font-weight: 800; margin-top: 2px; }
+  .bf.bad { margin: 0 -10px; padding: 12px 10px; background: var(--red-bg); border-radius: 10px; box-shadow: inset 0 0 0 2px var(--red); }
+  .bf.bad + .bf { border-top: 0; }
+  .bf.bad .k, .bf.bad .v { color: var(--red); }
+  .sent-line { font-size: 14px; color: var(--text-2); margin: 0 4px 14px; }
+  .big-ref { background: var(--card); border-radius: 16px; padding: 14px 18px; margin-bottom: 18px; }
+  .big-ref .k { font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .big-ref .v { font-size: 34px; font-weight: 700; margin-top: 2px; }
+  .leaves { display: flex; align-items: center; gap: 8px; color: var(--red); font-weight: 700; font-size: 15px; margin-bottom: 8px; }
+  .leaves .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .help-note { font-size: 14px; color: var(--muted); text-align: center; margin-top: 10px; }
+
+  /* Resolved */
+  .timeline { margin-top: 6px; }
+  .tl { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
+  .tl:last-child { padding-bottom: 2px; }
+  .tl .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--green); margin-top: 4px; flex-shrink: 0; position: relative; z-index: 1; }
+  .tl:not(:last-child)::before { content: ""; position: absolute; left: 5px; top: 14px; bottom: -2px; width: 2px; background: #CBE7D8; }
+  .tl .time { font-size: 14px; font-weight: 700; width: 44px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .tl .what { font-size: 14px; color: var(--text-2); line-height: 1.4; }
+
+  /* ───────── Demo controls (outside phone) ───────── */
+  #demo {
+    flex-shrink: 0; width: 100%; display: flex; justify-content: center; padding: 14px 16px 18px;
+  }
+  #demo .bar {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; background: #fff; padding: 6px;
+    border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.08); max-width: 100%;
+  }
+  #demo button {
+    font-size: 13px; font-weight: 600; padding: 9px 12px; border-radius: 9px; color: #444; white-space: nowrap;
+  }
+  #demo button:hover { background: #F2F2F2; }
+  #demo button.on { background: #1A1A1A; color: #fff; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="scaler">
+    <div class="phone">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="notch"></span>
+        <span class="icons">
+          <svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="#1A1A1A"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="#1A1A1A"/><rect x="10" y="3" width="3" height="9" rx="1" fill="#1A1A1A"/><rect x="15" y="0" width="3" height="12" rx="1" fill="#1A1A1A"/></svg>
+          <svg width="26" height="12" viewBox="0 0 26 12"><rect x="0.5" y="0.5" width="22" height="11" rx="3" fill="none" stroke="#1A1A1A" opacity=".4"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="#1A1A1A"/><rect x="23.5" y="4" width="1.5" height="4" rx=".75" fill="#1A1A1A" opacity=".4"/></svg>
+        </span>
+      </div>
+
+      <div id="viewport">
+      <!-- SCREEN 1 — Booking confirmed -->
+      <div class="screen" id="s-confirm">
+        <div class="appbar">
+          <button class="icon-btn back" aria-label="Back"></button>
+          <span class="wordmark">klook</span>
+        </div>
+        <div class="scroll">
+          <div class="tick-wrap">
+            <div class="tick"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+            <h2>Booking confirmed</h2>
+          </div>
+
+          <div class="card">
+            <div class="act-head">
+              <div class="thumb" data-thumb="boat"></div>
+              <div>
+                <div class="name">Sanur ⇄ Nusa Penida Fast Boat (return)</div>
+                <div class="op">Bali Ocean Fast Cruise</div>
+              </div>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="k">Date</span><span class="v">Saturday 5 September</span></div>
+              <div class="row"><span class="k">Time</span><span class="v">07:00</span></div>
+              <div class="row"><span class="k">Passengers</span><span class="v">2</span></div>
+              <div class="row"><span class="k">Lead name</span><span class="v">Alex Mendoza</span></div>
+              <div class="row"><span class="k">Booking ref</span><span class="v mono">KLK-8H2M4Q</span></div>
+              <div class="row"><span class="k">Check-in</span><span class="v">Sanur Harbour, Gate 2</span></div>
+              <div class="row"><span class="k">Total</span><span class="v">₹2,480 for 2</span></div>
+            </div>
+            <div class="received" data-received></div>
+          </div>
+          <p class="caption">This is exactly what we sent them. Check it now, not at the harbour.</p>
+
+          <div class="card qr-card">
+            <div class="card-title">Your voucher</div>
+            <div class="qr" data-qr="1"></div>
+            <div class="sub mono">KLK-8H2M4Q</div>
+          </div>
+        </div>
+        <div class="footer-bar">
+          <button class="btn btn-primary" data-go="list">View my bookings</button>
+        </div>
+      </div>
+
+      <!-- SCREENS 2 / 3 / empty / not confirmed — My bookings -->
+      <div class="screen" id="s-list">
+        <div class="appbar">
+          <button class="icon-btn back" aria-label="Back"></button>
+          <h1>My bookings</h1>
+          <button class="icon-btn" id="refresh" aria-label="Refresh">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+          </button>
+        </div>
+        <div class="scroll">
+          <div class="seg"><span class="on">Upcoming</span><span>Past</span></div>
+          <div id="list-items"></div>
+        </div>
+        <div class="tabbar">
+          <div><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</div>
+          <div><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Explore</div>
+          <div class="on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Bookings</div>
+          <div><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Account</div>
+        </div>
+      </div>
+
+      <!-- Booking detail -->
+      <div class="screen" id="s-detail">
+        <div class="appbar">
+          <button class="icon-btn back" aria-label="Back"></button>
+          <h1>Booking details</h1>
+        </div>
+        <div class="scroll">
+          <div class="alert" id="mismatch-alert">
+            <div class="alert-head"><span class="alert-icon">!</span><span class="alert-text">The departure time we sent doesn't match your booking</span></div>
+            <button class="btn" data-go="mismatch">See the difference</button>
+          </div>
+
+          <div class="today" id="today-banner">
+            <span class="t">Travelling today?</span>
+            <button class="btn btn-primary" data-go="desk">My booking isn't showing</button>
+          </div>
+
+          <div class="card">
+            <div class="act-head">
+              <div class="thumb" data-thumb="boat"></div>
+              <div>
+                <div class="name">Sanur ⇄ Nusa Penida Fast Boat (return)</div>
+                <div class="op">Bali Ocean Fast Cruise</div>
+              </div>
+            </div>
+            <div class="bk-status" id="detail-status"></div>
+            <div class="rows">
+              <div class="row"><span class="k">Date</span><span class="v">Saturday 5 September</span></div>
+              <div class="row"><span class="k">Time</span><span class="v">07:00</span></div>
+              <div class="row"><span class="k">Passengers</span><span class="v">2</span></div>
+              <div class="row"><span class="k">Lead name</span><span class="v">Alex Mendoza</span></div>
+              <div class="row"><span class="k">Booking ref</span><span class="v mono">KLK-8H2M4Q</span></div>
+              <div class="row"><span class="k">Check-in</span><span class="v">Sanur Harbour, Gate 2</span></div>
+            </div>
+            <div class="received" data-received></div>
+          </div>
+
+          <div class="card qr-card">
+            <div class="card-title">Your voucher</div>
+            <div class="qr" data-qr="1"></div>
+            <div class="sub mono">KLK-8H2M4Q</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 4 — Mismatch -->
+      <div class="screen" id="s-mismatch">
+        <div class="appbar">
+          <button class="icon-btn back" aria-label="Back"></button>
+          <h1>Check your booking</h1>
+        </div>
+        <div class="scroll mm">
+          <div id="mm-compare">
+            <h2>The departure time doesn't match</h2>
+            <p class="body">We'll fix this with Bali Ocean Fast Cruise before you travel.</p>
+            <div class="cmp">
+              <div class="h">YOUR BOOKING</div><div class="h">WHAT WE SENT THEM</div>
+              <div class="c">Sat 5 Sep</div><div class="c">Sat 5 Sep</div>
+              <div class="c bad">07:00</div><div class="c bad">09:00</div>
+              <div class="c">2 passengers</div><div class="c">2 passengers</div>
+              <div class="c">Alex Mendoza</div><div class="c">Alex Mendoza</div>
+            </div>
+            <button class="btn btn-primary" id="report-btn">Report this</button>
+          </div>
+          <div id="mm-done" class="done-state" hidden>
+            <div class="tick"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+            <h2>Reported. We'll update you before 5 Sep, 07:00.</h2>
+            <div class="ref-box">Reference number<b class="mono">RPT-30917</b></div>
+            <button class="btn btn-secondary" data-go="detail">Back to booking</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 5 — At the check-in desk -->
+      <div class="screen" id="s-desk">
+        <div class="appbar">
+          <button class="icon-btn back" aria-label="Back"></button>
+          <h1>Check-in help</h1>
+        </div>
+        <div class="scroll desk">
+          <h2>Show this to the staff</h2>
+          <div class="big-fields">
+            <div class="bf"><div class="k">Date</div><div class="v">Sat 5 Sep</div></div>
+            <div class="bf bad"><div class="k">Departure</div><div class="v">09:00</div></div>
+            <div class="bf"><div class="k">Passengers</div><div class="v">2</div></div>
+            <div class="bf"><div class="k">Lead name</div><div class="v">Alex Mendoza</div></div>
+          </div>
+          <p class="sent-line">Sent to Bali Ocean Fast Cruise on 3 Sep, 14:12</p>
+          <div class="big-ref"><div class="k">Booking ref</div><div class="v mono">KLK-8H2M4Q</div></div>
+          <div class="leaves"><span class="dot"></span>Boat leaves in 12 min</div>
+          <button class="btn btn-primary" id="help-btn">Get urgent help</button>
+          <p class="help-note">A Klook agent will call the operator directly.</p>
+        </div>
+      </div>
+
+      <!-- SCREEN 6 — Resolved -->
+      <div class="screen" id="s-resolved">
+        <div class="appbar">
+          <button class="icon-btn back" aria-label="Back"></button>
+          <h1>Booking details</h1>
+        </div>
+        <div class="scroll">
+          <div class="tick-wrap">
+            <div class="tick"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+            <h2>Sorted. You're on the 07:00 boat.</h2>
+          </div>
+          <div class="card">
+            <div class="timeline">
+              <div class="tl"><span class="dot"></span><span class="time">07:02</span><span class="what">You reported the problem</span></div>
+              <div class="tl"><span class="dot"></span><span class="time">07:04</span><span class="what">Klook agent called Bali Ocean Fast Cruise</span></div>
+              <div class="tl"><span class="dot"></span><span class="time">07:06</span><span class="what">Operator updated their booking to 07:00</span></div>
+            </div>
+          </div>
+          <div class="card qr-card">
+            <span class="pill confirmed">✓ Confirmed by operator · updated 07:06</span>
+            <div class="qr" data-qr="2"></div>
+            <div class="sub mono">KLK-8H2M4Q</div>
+          </div>
+          <button class="btn btn-secondary" data-go="list" data-status="resolved">Done</button>
+        </div>
+      </div>
+      </div><!-- /#viewport -->
+    </div>
+  </div>
+</div>
+
+<!-- Demo controls: outside the phone frame -->
+<div id="demo">
+  <div class="bar">
+    <button data-demo="confirm">Confirmation</button>
+    <button data-demo="waiting">Waiting</button>
+    <button data-demo="confirmed">Confirmed</button>
+    <button data-demo="detected">Mismatch detected</button>
+    <button data-demo="mismatch">Mismatch</button>
+    <button data-demo="desk">At the desk</button>
+    <button data-demo="resolved">Resolved</button>
+    <button data-demo="empty">Empty state</button>
+    <button data-demo="notconfirmed">Not confirmed</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // When Klook sent the booking to the operator.
+  var SENT_CARD = { sentAt: '3 Sep, 14:12' };
+
+  var STATUS = {
+    waiting: {
+      pill: '⏳ Waiting for operator to confirm',
+      note: "We've asked Bali Ocean Fast Cruise to confirm. You'll see it here within 24 hours."
+    },
+    confirmed: { pill: '✓ Confirmed by operator · 4 Sep, 10:26', note: '' },
+    resolved: { pill: '✓ Confirmed by operator · updated 07:06', note: '', cls: 'confirmed' },
+    notconfirmed: {
+      pill: "⚠ We're confirming this with the operator",
+      note: 'Our team is contacting Bali Ocean Fast Cruise. We’ll update you before you travel.'
+    }
+  };
+
+  /* ───── Static pieces ───── */
+  var BACK_SVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
+  document.querySelectorAll('.back').forEach(function (b) { b.innerHTML = BACK_SVG; b.addEventListener('click', back); });
+
+  function boatThumb(size) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 72 72"><defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8FD3F4"/><stop offset="1" stop-color="#DDF3FB"/></linearGradient></defs>' +
+      '<rect width="72" height="72" fill="url(#sky)"/><circle cx="56" cy="16" r="7" fill="#FFD36B"/>' +
+      '<path d="M0 40 Q18 30 34 38 T72 34 V72 H0Z" fill="#7FB77E"/>' +
+      '<rect y="44" width="72" height="28" fill="#1E88B6"/>' +
+      '<path d="M14 50 h40 l-6 8 h-30z" fill="#fff"/><rect x="24" y="44" width="18" height="6" rx="1.5" fill="#fff"/><rect x="27" y="45.5" width="4" height="3" fill="#1E88B6"/><rect x="33" y="45.5" width="4" height="3" fill="#1E88B6"/>' +
+      '<path d="M6 64 q6 -3 12 0 t12 0 t12 0 t12 0 t12 0" stroke="#fff" stroke-opacity=".5" fill="none" stroke-width="1.5"/></svg>';
+  }
+  function museumThumb(size) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 72 72"><rect width="72" height="72" fill="#F3E9DA"/>' +
+      '<path d="M12 30 L36 16 L60 30Z" fill="#B5835A"/><rect x="14" y="30" width="44" height="4" fill="#9C6B45"/>' +
+      '<rect x="18" y="36" width="5" height="20" fill="#C9A27E"/><rect x="29" y="36" width="5" height="20" fill="#C9A27E"/><rect x="40" y="36" width="5" height="20" fill="#C9A27E"/><rect x="51" y="36" width="5" height="20" fill="#C9A27E"/>' +
+      '<rect x="12" y="56" width="48" height="5" fill="#9C6B45"/></svg>';
+  }
+  function danceThumb(size) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 72 72"><defs><linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7894A"/><stop offset="1" stop-color="#7A3E8E"/></linearGradient></defs>' +
+      '<rect width="72" height="72" fill="url(#dusk)"/><circle cx="36" cy="40" r="12" fill="#FFC15E" opacity=".9"/><path d="M0 56 H72 V72 H0Z" fill="#2B1B33"/>' +
+      '<path d="M26 56 l4 -10 l3 10 M40 56 l3 -12 l4 12" stroke="#2B1B33" stroke-width="3" fill="none"/></svg>';
+  }
+  document.querySelectorAll('[data-thumb="boat"]').forEach(function (t) { t.innerHTML = boatThumb(72); });
+
+  // Deterministic QR-style placeholder.
+  function qrSvg(seed, px) {
+    var n = 25, m = px / n, s = seed * 2654435761 >>> 0;
+    function rnd() { s = (s + 0x6D2B79F5) >>> 0; var t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    function inFinder(x, y) { return (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9); }
+    var out = '<svg width="' + px + '" height="' + px + '" viewBox="0 0 ' + px + ' ' + px + '" shape-rendering="crispEdges">';
+    for (var y = 0; y < n; y++) for (var x = 0; x < n; x++) {
+      if (inFinder(x, y)) continue;
+      if (rnd() < 0.48) out += '<rect x="' + x * m + '" y="' + y * m + '" width="' + m + '" height="' + m + '" fill="#111"/>';
+    }
+    [[0, 0], [n - 7, 0], [0, n - 7]].forEach(function (p) {
+      var X = p[0] * m, Y = p[1] * m;
+      out += '<rect x="' + X + '" y="' + Y + '" width="' + 7 * m + '" height="' + 7 * m + '" fill="#111"/>' +
+             '<rect x="' + (X + m) + '" y="' + (Y + m) + '" width="' + 5 * m + '" height="' + 5 * m + '" fill="#fff"/>' +
+             '<rect x="' + (X + 2 * m) + '" y="' + (Y + 2 * m) + '" width="' + 3 * m + '" height="' + 3 * m + '" fill="#111"/>';
+    });
+    return out + '</svg>';
+  }
+  document.querySelectorAll('[data-qr]').forEach(function (q) { q.innerHTML = qrSvg(+q.dataset.qr === 2 ? 77 : 13, 150); });
+
+  // Under the booking details: what the operator received, and a way to flag it.
+  var receivedHtml =
+    '<p class="received-line">Bali Ocean Fast Cruise received these details on ' + SENT_CARD.sentAt + '</p>' +
+    '<button class="text-btn" data-go="mismatch">This doesn\u2019t look right</button>';
+  document.querySelectorAll('[data-received]').forEach(function (c) { c.innerHTML = receivedHtml; });
+
+
+  function statusBlock(key) {
+    var s = STATUS[key];
+    return '<span class="pill ' + (s.cls || key) + '">' + s.pill + '</span>' +
+      (s.note ? '<div class="status-note">' + s.note + '</div>' : '');
+  }
+
+  /* ───── State & rendering ───── */
+  var state = { screen: 'confirm', status: 'waiting', variant: 'normal', reported: false, alert: false };
+  var history = [];
+
+  function render() {
+    document.querySelectorAll('.screen').forEach(function (el) { el.classList.toggle('active', el.id === 's-' + state.screen); });
+
+    if (state.screen === 'list') {
+      var boat =
+        '<button class="bk tappable" data-go="detail">' +
+          '<div class="bk-top"><div class="thumb">' + boatThumb(72) + '</div><div>' +
+            '<div class="bk-title">Sanur ⇄ Nusa Penida Fast Boat (return)</div>' +
+            '<div class="bk-meta">Sat 5 Sep · 07:00 · 2 passengers</div>' +
+            '<div class="bk-ref mono">KLK-8H2M4Q</div>' +
+          '</div></div>' +
+          '<div class="bk-status">' + statusBlock(state.status) + '</div>' +
+        '</button>';
+      var html;
+      if (state.variant === 'empty') {
+        html =
+          '<div class="bk">' +
+            '<div class="bk-top"><div class="thumb">' + museumThumb(72) + '</div><div>' +
+              '<div class="bk-title">Museum Puri Lukisan Ubud: Admission Ticket</div>' +
+              '<div class="bk-meta">Fri 4 Sep · Any time · 2 tickets</div>' +
+              '<div class="bk-ref mono">KLK-3T7V9C</div>' +
+            '</div></div>' +
+            '<div class="bk-status"><div class="status-note" style="margin:0">This operator checks you in at the door, so there’s nothing to confirm in advance.</div></div>' +
+          '</div>' + boat;
+      } else {
+        html = boat +
+          '<div class="bk">' +
+            '<div class="bk-top"><div class="thumb">' + danceThumb(72) + '</div><div>' +
+              '<div class="bk-title">Uluwatu Kecak Fire Dance Ticket</div>' +
+              '<div class="bk-meta">Sun 6 Sep · 18:00 · 2 tickets</div>' +
+              '<div class="bk-ref mono">KLK-5R1N7D</div>' +
+            '</div></div>' +
+            '<div class="bk-status"><span class="pill confirmed">✓ Confirmed by operator · 2 Sep, 16:40</span></div>' +
+          '</div>';
+      }
+      document.getElementById('list-items').innerHTML = html;
+      document.getElementById('refresh').style.visibility = state.status === 'waiting' && state.variant === 'normal' ? 'visible' : 'hidden';
+    }
+
+    if (state.screen === 'detail') {
+      var ds = document.getElementById('detail-status');
+      ds.innerHTML = state.alert ? '' : statusBlock(state.status);
+      ds.style.display = state.alert ? 'none' : '';
+      document.getElementById('mismatch-alert').style.display = state.alert ? 'block' : 'none';
+      document.getElementById('today-banner').style.display = state.status === 'confirmed' && !state.alert ? 'flex' : 'none';
+    }
+
+    if (state.screen === 'mismatch') {
+      document.getElementById('mm-compare').hidden = state.reported;
+      document.getElementById('mm-done').hidden = !state.reported;
+    }
+
+    if (state.screen === 'desk') {
+      var hb = document.getElementById('help-btn');
+      hb.disabled = false; hb.textContent = 'Get urgent help';
+    }
+
+    document.getElementById('viewport').scrollTop = 0;
+
+    var demoKey = { confirm: 'confirm', mismatch: 'mismatch', desk: 'desk', resolved: 'resolved' }[state.screen];
+    if (state.screen === 'list' || state.screen === 'detail') {
+      demoKey = state.variant === 'empty' ? 'empty' : { waiting: 'waiting', confirmed: 'confirmed', notconfirmed: 'notconfirmed' }[state.status];
+    }
+    if (state.screen === 'detail' && state.alert) demoKey = 'detected';
+    document.querySelectorAll('[data-demo]').forEach(function (b) { b.classList.toggle('on', b.dataset.demo === demoKey); });
+  }
+
+  function snap() { return { screen: state.screen, status: state.status, variant: state.variant, reported: state.reported, alert: state.alert }; }
+  function go(screen, patch) {
+    history.push(snap());
+    state.screen = screen;
+    if (screen === 'mismatch') state.reported = false;
+    if (screen !== 'mismatch') state.alert = false;
+    if (patch) for (var k in patch) state[k] = patch[k];
+    render();
+  }
+  function back() {
+    if (!history.length) return;
+    state = history.pop();
+    render();
+  }
+
+  // In-app navigation (event delegation so rendered list items work too)
+  document.querySelector('.phone').addEventListener('click', function (e) {
+    var t = e.target.closest('[data-go]');
+    if (!t) return;
+    var to = t.dataset.go, patch = {};
+    if (t.dataset.status) patch.status = t.dataset.status;
+    if (to === 'list' && state.screen === 'confirm') patch.status = 'waiting';
+    if (to === 'list') patch.variant = 'normal';
+    if (to === 'detail' && state.screen === 'mismatch') {
+      // after reporting, return to the booking on the day of travel
+      state.reported = false; patch.status = 'confirmed';
+    }
+    go(to, patch);
+  });
+
+  // 2 → 3: refresh picks up the operator's confirmation
+  document.getElementById('refresh').addEventListener('click', function () {
+    var btn = this; btn.style.transition = 'transform .5s'; btn.style.transform = 'rotate(360deg)';
+    setTimeout(function () { btn.style.transition = ''; btn.style.transform = ''; go('list', { status: 'confirmed' }); }, 500);
+  });
+
+  document.getElementById('report-btn').addEventListener('click', function () { state.reported = true; render(); });
+
+  document.getElementById('help-btn').addEventListener('click', function () {
+    var b = this; b.disabled = true; b.textContent = 'Connecting you to an agent…';
+    setTimeout(function () { if (state.screen === 'desk') go('resolved', { status: 'resolved' }); }, 1200);
+  });
+
+  // Demo controls: jump straight to a state, with a sensible back-stack.
+  var C = function (o) { return Object.assign({ screen: 'confirm', status: 'waiting', variant: 'normal', reported: false, alert: false }, o); };
+  var DEMO = {
+    confirm:      { s: C({}), h: [] },
+    waiting:      { s: C({ screen: 'list', status: 'waiting' }), h: [C({})] },
+    confirmed:    { s: C({ screen: 'list', status: 'confirmed' }), h: [C({}), C({ screen: 'list' })] },
+    detected:     { s: C({ screen: 'detail', alert: true }), h: [C({}), C({ screen: 'list' })] },
+    mismatch:     { s: C({ screen: 'mismatch' }), h: [C({})] },
+    desk:         { s: C({ screen: 'desk', status: 'confirmed' }), h: [C({ screen: 'list', status: 'confirmed' }), C({ screen: 'detail', status: 'confirmed' })] },
+    resolved:     { s: C({ screen: 'resolved', status: 'resolved' }), h: [C({ screen: 'list', status: 'confirmed' }), C({ screen: 'detail', status: 'confirmed' }), C({ screen: 'desk', status: 'confirmed' })] },
+    empty:        { s: C({ screen: 'list', status: 'confirmed', variant: 'empty' }), h: [C({})] },
+    notconfirmed: { s: C({ screen: 'list', status: 'notconfirmed' }), h: [C({})] }
+  };
+  document.querySelectorAll('[data-demo]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var d = DEMO[b.dataset.demo];
+      state = Object.assign({}, d.s);
+      history = d.h.map(function (x) { return Object.assign({}, x); });
+      render();
+    });
+  });
+
+  // Fit the phone to the window without page scroll.
+  function fit() {
+    var stage = document.getElementById('stage');
+    var avail = stage.clientHeight - 24, availW = window.innerWidth - 40;
+    var s = Math.min(1, avail / 864, availW / 410);
+    var sc = document.getElementById('scaler');
+    sc.style.transform = 'scale(' + s + ')';
+    sc.style.margin = (-(844 * (1 - s)) / 2) + 'px ' + (-(390 * (1 - s)) / 2) + 'px';
+  }
+  // Drag to scroll with a mouse, like a finger on a phone. A drag never counts as a tap.
+  (function () {
+    var vp = document.getElementById('viewport'), startY = 0, startTop = 0, down = false, dragged = false;
+    vp.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      down = true; dragged = false; startY = e.clientY; startTop = vp.scrollTop;
+    });
+    window.addEventListener('mousemove', function (e) {
+      if (!down) return;
+      var scale = vp.getBoundingClientRect().height / vp.offsetHeight || 1;
+      var dy = (e.clientY - startY) / scale;
+      if (!dragged && Math.abs(dy) > 6) { dragged = true; document.body.style.userSelect = 'none'; }
+      if (dragged) { vp.scrollTop = startTop - dy; e.preventDefault(); }
+    });
+    window.addEventListener('mouseup', function () { down = false; document.body.style.userSelect = ''; });
+    vp.addEventListener('click', function (e) {
+      if (dragged) { e.stopPropagation(); e.preventDefault(); dragged = false; }
+    }, true);
+  })();
+
+  window.addEventListener('resize', fit);
+  fit();
+  render();
+})();
+</script>
+</body>
+</html>
