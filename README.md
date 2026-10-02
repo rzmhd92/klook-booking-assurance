@@ -1,6 +1,6 @@
 # Booking Assurance: clickable prototype
 
-**Live prototype:** _URL added after deployment_
+**Live prototype:** https://klook-booking-assurance.vercel.app/
 
 A clickable mobile prototype of **Booking Assurance**, a proposed feature for the Klook travel app, built for a product management assignment.
 
