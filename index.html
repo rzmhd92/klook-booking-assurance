@@ -120,6 +120,7 @@
 
   .received { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
   .received-line { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .received-line .ok { color: var(--green); font-weight: 700; margin-right: 4px; }
   .received .text-btn { margin-top: 2px; }
   .alert {
     background: var(--red-bg); border: 1px solid #F3C2C2; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
@@ -136,7 +137,6 @@
     position: sticky; bottom: 0; z-index: 2; background: var(--card);
     border-top: 1px solid var(--line); padding: 12px 16px 30px;
   }
-  .caption { font-size: 13px; color: var(--muted); line-height: 1.45; margin: -4px 4px 16px; }
 
   /* Bookings list */
   .seg { display: flex; gap: 8px; margin-bottom: 14px; }
@@ -263,9 +263,8 @@
               <div class="row"><span class="k">Check-in</span><span class="v">Sanur Harbour, Gate 2</span></div>
               <div class="row"><span class="k">Total</span><span class="v">₹2,480 for 2</span></div>
             </div>
-            <div class="received" data-received></div>
+            <div class="received" data-received="assured"></div>
           </div>
-          <p class="caption">This is exactly what we sent them. Check it now, not at the harbour.</p>
 
           <div class="card qr-card">
             <div class="card-title">Your voucher</div>
@@ -504,10 +503,17 @@
   document.querySelectorAll('[data-qr]').forEach(function (q) { q.innerHTML = qrSvg(+q.dataset.qr === 2 ? 77 : 13, 150); });
 
   // Under the booking details: what the operator received, and a way to flag it.
+  var receivedLine = 'Bali Ocean Fast Cruise received these details on ' + SENT_CARD.sentAt;
+  var flagBtn = '<button class="text-btn" data-go="mismatch">This doesn\u2019t look right</button>';
+  var receivedAssuredHtml =
+    '<p class="received-line"><span class="ok">✓</span>' + receivedLine + '</p>' +
+    '<p class="received-line">We check these against your booking automatically.</p>' + flagBtn;
   var receivedHtml =
-    '<p class="received-line">Bali Ocean Fast Cruise received these details on ' + SENT_CARD.sentAt + '</p>' +
+    '<p class="received-line">' + receivedLine + '</p>' +
     '<button class="text-btn" data-go="mismatch">This doesn\u2019t look right</button>';
-  document.querySelectorAll('[data-received]').forEach(function (c) { c.innerHTML = receivedHtml; });
+  document.querySelectorAll('[data-received]').forEach(function (c) {
+    c.innerHTML = c.dataset.received === 'assured' ? receivedAssuredHtml : receivedHtml;
+  });
 
 
   function statusBlock(key) {
